@@ -37,3 +37,15 @@ export async function HandlePost<T>(
 
     return HandleFetch<T>(url, options)
 }
+
+export async function HandlePatch<T>(
+    url: string,
+    body: string | FormData,
+): Promise<T> {
+    const options: RequestInit = {
+        method: "PATCH",
+        body: body,
+    };
+
+    return HandleFetch<T>(url, options)
+}
