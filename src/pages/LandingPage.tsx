@@ -1,31 +1,20 @@
-import React, { useContext, useRef, useState, type ChangeEvent } from 'react'
+import React, { useRef, useState, type ChangeEvent } from 'react'
 import { HandlePost } from '../utils/API';
-import type { DetectionResult } from '../interfaces/DetectionResult';
+import type { ReceiptDetectionResult } from '../interfaces/DetectionResult';
 import { useNavigate } from 'react-router-dom';
-import { ToastContextV2 } from '../contexts/ToastDataV2';
+import type { CreateReceiptResponse } from '../interfaces/Receipt';
+import { useToast } from '../contexts/ToastContext';
 
 const LandingPage = (): React.ReactElement => {
     const navigate = useNavigate()
 
-    const { toasts, setToasts } = useContext(ToastContextV2)
+    const { addToast, removeToast } = useToast()
 
     const [fileValue, setFileValue] = useState<File>();
     const [preview, setPreview] = useState<string>();
     const [confirmed, setConfirmed] = useState(false);
 
     const attachmentFile = useRef<HTMLInputElement>(null);
-
-    function addToast(message: string, isSuccess: boolean, withLoginRedirection: boolean) {
-        if (toasts.length >= 5) {
-            return
-        }
-
-        setToasts((prev) => [
-            ...prev,
-            { id: `landing:${Date.now()}`, message: message, isSuccess: isSuccess, withLoginRedirection: withLoginRedirection },
-        ]);
-    }
-
 
     function handleAttachmentFileChange(e: ChangeEvent<HTMLInputElement>) {
         if (!e.target.files) {
@@ -47,15 +36,17 @@ const LandingPage = (): React.ReactElement => {
         }
 
         if (fileFormat && !["png", "jpg", "jpeg"].includes(fileFormat)) {
+            const toastId = `landing:${Date.now()}`
             errorMsg = `File must be in either png, jpg, or jpeg format`;
-            addToast(errorMsg, false, false)
+            addToast(toastId, errorMsg, false, false, 3 * 1000)
             handleCancel()
             return
         }
 
         if (fileSize > 2000000) {
+            const toastId = `landing:${Date.now()}`
             errorMsg = `File must not be greater than 2Mb`;
-            addToast(errorMsg, false, false)
+            addToast(toastId, errorMsg, false, false, 3 * 1000)
             handleCancel()
             return
         }
@@ -66,25 +57,54 @@ const LandingPage = (): React.ReactElement => {
 
     const handleConfirm = () => {
         if (!fileValue) {
-            addToast("Receipt image is missing", false, false)
+            const toastId = `landing:${Date.now()}`
+            addToast(toastId, "Receipt image is missing", false, false, 3 * 1000)
             return
         }
 
         setConfirmed(true);
 
-        const url = import.meta.env.VITE_RECEIPT_DETECTOR_BASE_URL + "/receipt/detect"
-        const body = new FormData();
+        const detectReceiptUrl = import.meta.env.VITE_RECEIPT_DETECTOR_BASE_URL + "/receipt/detect"
+        const detectReceiptBody = new FormData();
 
-        body.append("file", fileValue)
+        detectReceiptBody.append("file", fileValue)
 
-        HandlePost<DetectionResult>(
-            url,
-            body
+        const toastIdLoadingDetectReceipt = `landing:loadingDetectReceipt:${Date.now()}`
+        addToast(toastIdLoadingDetectReceipt, "⏳ Detecting Receipt...", undefined, false)
+
+        HandlePost<ReceiptDetectionResult>(
+            detectReceiptUrl,
+            detectReceiptBody
         ).then((data) => {
-            navigate("/bill/" + data.result_id)
+            removeToast(toastIdLoadingDetectReceipt)
+            addToast(`landing:successDetectReceipt:${Date.now()}`, "✅ Receipt detected successfully!", true, false, 3 * 1000)
+
+            const createReceiptlUrl = import.meta.env.VITE_RECEIPT_DETECTOR_BASE_URL + "/receipt"
+            const createReceiptlBody = {
+                "receipt": {
+                    "receipt_name": "My Receipt",
+                    "result_id": data.result_id
+                },
+                "detection_result": data.result
+            }
+
+            const toastIdLoadingCreateReceipt = `landing:loadingCreateReceipt:${Date.now()}`
+            addToast(toastIdLoadingCreateReceipt, "⏳ Creating your Receipt...", undefined, false)
+
+            HandlePost<CreateReceiptResponse>(
+                createReceiptlUrl,
+                JSON.stringify(createReceiptlBody),
+            ).then((data) => {
+                removeToast(toastIdLoadingCreateReceipt)
+                addToast(`landing:successCreateReceipt:${Date.now()}`, "✅ Finished extracting your receipt.", true, false, 3 * 1000)
+
+                navigate("/receipt/" + data.receipt_id)
+            }).catch(() => {
+                addToast(`landing:${Date.now()}`, "❌ Couldn’t save your receipt. Please try again.", false, false, 3 * 1000)
+            })
         }).catch(() => {
             handleCancel()
-            addToast("Something went wrong", false, false)
+            addToast(`landing:${Date.now()}`, "❌ Receipt detection failed. Make sure the photo is clear and try again.", false, false, 3 * 1000)
         })
     };
 
