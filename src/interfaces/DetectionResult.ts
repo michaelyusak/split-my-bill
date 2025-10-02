@@ -14,7 +14,7 @@ export interface ItemDetail {
     info: ItemDetailInfo;
 }
 
-export interface DetectionResult {
+export interface ReceiptDetectionResult {
     result_id: string;
     image_url: string;
     result: ItemDetail[];
