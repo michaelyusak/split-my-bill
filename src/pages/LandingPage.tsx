@@ -104,6 +104,7 @@ const LandingPage = (): React.ReactElement => {
             })
         }).catch(() => {
             handleCancel()
+            removeToast(toastIdLoadingDetectReceipt)
             addToast(`landing:${Date.now()}`, "❌ Receipt detection failed. Make sure the photo is clear and try again.", false, false, 3 * 1000)
         })
     };
