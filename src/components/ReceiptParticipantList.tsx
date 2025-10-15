@@ -25,10 +25,8 @@ const ReceiptParticipantList = ({ receiptId }: receiptParticipantListProps): Rea
             })
     }
 
-    const updateParticipant = (updated: Participant) => {
-        setParticipants((prev) =>
-            prev.map((p) => (p.participant_id === updated.participant_id ? updated : p))
-        );
+    const updateParticipant = () => {
+        fetchParticipants()
         setSelected(null); // close modal
     };
 
@@ -70,6 +68,7 @@ const ReceiptParticipantList = ({ receiptId }: receiptParticipantListProps): Rea
                     receiptId={receiptId}
                     defaultValue={selected}
                     onClose={() => setSelected(null)}
+                    onSuccess={(_) => updateParticipant()}
                 ></ParticipantModal>
             )}
 
