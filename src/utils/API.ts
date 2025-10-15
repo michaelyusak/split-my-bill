@@ -1,13 +1,4 @@
-export async function HandleGet<T>(
-    url: string,
-): Promise<T> {
-    const options: RequestInit = {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-        },
-    };
-
+async function HandleFetch<T>(url: string, options: RequestInit): Promise<T> {
     let response: Response;
 
     try {
@@ -19,10 +10,54 @@ export async function HandleGet<T>(
     const responseData = await response.json();
 
     if (!response.ok) {
-        console.log(responseData.message);
-
         throw new Error(`failed to fetch data`);
     }
 
     return responseData.data;
+}
+
+export async function HandleGet<T>(
+    url: string,
+): Promise<T> {
+    const options: RequestInit = {
+        method: "GET",
+    };
+
+    return HandleFetch<T>(url, options)
+}
+
+export async function HandlePost<T>(
+    url: string,
+    body: string | FormData,
+): Promise<T> {
+    const options: RequestInit = {
+        method: "POST",
+        body: body,
+    };
+
+    return HandleFetch<T>(url, options)
+}
+
+export async function HandlePatch<T>(
+    url: string,
+    body: string | FormData,
+): Promise<T> {
+    const options: RequestInit = {
+        method: "PATCH",
+        body: body,
+    };
+
+    return HandleFetch<T>(url, options)
+}
+
+export async function HandleDelete<T>(
+    url: string,
+    body?: string | FormData,
+): Promise<T> {
+    const options: RequestInit = {
+        method: "DELETE",
+        body: body,
+    };
+
+    return HandleFetch<T>(url, options)
 }
