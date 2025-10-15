@@ -49,3 +49,15 @@ export async function HandlePatch<T>(
 
     return HandleFetch<T>(url, options)
 }
+
+export async function HandleDelete<T>(
+    url: string,
+    body?: string | FormData,
+): Promise<T> {
+    const options: RequestInit = {
+        method: "DELETE",
+        body: body,
+    };
+
+    return HandleFetch<T>(url, options)
+}

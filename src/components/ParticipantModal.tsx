@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import type { AllowedContactTypes, Contact, Participant } from "../interfaces/Participant";
-import { HandleGet, HandlePost } from "../utils/API";
+import { HandleDelete, HandleGet, HandlePatch, HandlePost } from "../utils/API";
 import EditableP from "./EditableP";
 import { FiTrash } from "react-icons/fi";
 import { IsValidEmail } from "../utils/Email";
 import { IsValidWhatsappNumber } from "../utils/Whatsapp";
 import { useToast } from "../contexts/ToastContext";
+import { ParseGoDuration } from "../utils/Duration";
 
 type participantModalProps = {
     receiptId: number
@@ -19,7 +20,7 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
     const { addToast } = useToast()
 
     const [name, setName] = useState(defaultValue?.participant_name || "");
-    const [contacts, setContacts] = useState<Contact[]>([])
+    const [contacts, setContacts] = useState<Contact[]>(defaultValue?.contacts || [])
     // const [avatar, setAvatar] = useState(DefaultAvatar);
     const [allowedContactTypes, setAllowedContactTypes] = useState<string[]>([])
     const [isNotifying, setIsNotifying] = useState<boolean>(true)
@@ -76,8 +77,8 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
         setContacts(newContacts)
     }
 
-    const handleAddParticipant = () => {
-        var isError = false
+    function checkInputs(): boolean {
+        var isError: boolean = false
 
         if (name === "") {
             isError = true
@@ -99,10 +100,10 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
             }
         })
 
-        if (isError) {
-            return
-        }
+        return isError
+    }
 
+    function checkNoticeInterval(): string {
         var noticeInterval: string = ""
 
         if (["d", "w"].includes(noticeIntervalUnit)) {
@@ -117,6 +118,18 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
         } else {
             noticeInterval = noticeIntervalValue + noticeIntervalUnit
         }
+
+        return noticeInterval
+    }
+
+    const handleAddParticipant = () => {
+        const isError = checkInputs()
+
+        if (isError) {
+            return
+        }
+
+        const noticeInterval = checkNoticeInterval()
 
         const url = import.meta.env.VITE_RECEIPT_DETECTOR_BASE_URL + `/receipt/${receiptId}/participant`
         const data: {
@@ -137,11 +150,78 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
                 addToast(`participantModal:successAddParticipant:${Date.now()}`, "✅ Participant Added", true, false, 3 * 1000)
 
                 onSuccess && onSuccess<typeof data>(data)
+
+                onClose()
             }).
             catch(() => {
                 addToast(`participantModal:failAddParticipant:${Date.now()}`, "Something went wrong", false, false, 3 * 1000)
 
                 onFail && onFail()
+
+                onClose()
+            })
+    }
+
+    const handleUpdateParticipant = () => {
+        const isError = checkInputs()
+
+        if (isError) {
+            return
+        }
+
+        const noticeInterval = checkNoticeInterval()
+
+        const url = import.meta.env.VITE_RECEIPT_DETECTOR_BASE_URL + `/receipt/${receiptId}/participant/${defaultValue?.participant_id}`
+        const data: {
+            participant: Participant
+        } = {
+            participant: {
+                participant_name: name,
+                participant_id: defaultValue?.participant_id,
+                contacts: contacts,
+                notifying: isNotifying,
+                notice_interval: noticeInterval
+            }
+        }
+
+        console.log(JSON.stringify(data))
+        console.log(noticeIntervalUnit, noticeIntervalValue)
+        console.log(defaultValue)
+
+        HandlePatch(url, JSON.stringify(data)).
+            then((data) => {
+                addToast(`participantModal:successUpdateParticipant:${Date.now()}`, "✅ Participant Updated", true, false, 3 * 1000)
+
+                onSuccess && onSuccess<typeof data>(data)
+
+                onClose()
+            }).
+            catch(() => {
+                addToast(`participantModal:failUpdateParticipant:${Date.now()}`, "Something went wrong", false, false, 3 * 1000)
+
+                onFail && onFail()
+
+                onClose()
+            })
+    }
+
+    const handleDeleteParticipant = () => {
+        const url = import.meta.env.VITE_RECEIPT_DETECTOR_BASE_URL + `/receipt/${receiptId}/participant/${defaultValue?.participant_id}`
+
+        HandleDelete(url).
+            then(() => {
+                addToast(`participantModal:successDeleteParticipant:${Date.now()}`, "✅ Participant Deleted", true, false, 3 * 1000)
+
+                onSuccess && onSuccess(undefined)
+
+                onClose()
+            }).
+            catch(() => {
+                addToast(`participantModal:failDeleteParticipant:${Date.now()}`, "Something went wrong", false, false, 3 * 1000)
+
+                onFail && onFail()
+
+                onClose()
             })
     }
 
@@ -177,6 +257,17 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
         }
     }, [defaultValue])
 
+    useEffect(() => {
+        if (!defaultValue) {
+            return
+        }
+
+        const { value, unit } = ParseGoDuration(defaultValue.notice_interval)
+
+        setNoticeIntervalValue(value)
+        setNoticeIntervalUnit(unit)
+    }, [])
+
     return (
         <div className="fixed inset-0 flex items-center justify-center">
             <div
@@ -186,7 +277,7 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
 
             <div className="relative z-10 bg-white rounded-lg shadow-lg p-6 w-[70%] h-[80%] flex flex-col items-center justify-between">
                 <div className="w-full flex flex-col gap-2 items-center">
-                    <h2 className="text-lg font-bold mb-4">{defaultValue ? "Update" : "Add"}</h2>
+                    <h2 className="text-xl font-bold mb-4">{defaultValue ? "Update" : "Add"} Participant</h2>
 
                     <div className="flex flex-col gap-5 items-center w-full">
                         {/* <div
@@ -280,7 +371,7 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
 
                             <button
                                 onClick={() => handleAddContact()}
-                                className="text-sm text-white bg-gray-500 px-2 py-1 rounded-xl">
+                                className="text-sm text-white bg-gray-500 hover:bg-gray-600 px-2 py-1 rounded-md">
                                 New Contact
                             </button>
                         </div>
@@ -336,11 +427,20 @@ const ParticipantModal = ({ receiptId, defaultValue, onClose, onSuccess, onFail 
                         Cancel
                     </button>
                     <button
-                        onClick={() => handleAddParticipant()}
+                        onClick={() => defaultValue ? handleUpdateParticipant() : handleAddParticipant()}
                         className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
                     >
                         {defaultValue ? "Update" : "Add"}
                     </button>
+
+                    {defaultValue && (
+                        <button
+                            onClick={() => handleDeleteParticipant()}
+                            className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+                        >
+                            Delete
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
